@@ -36,3 +36,35 @@ This simulation was built using MATLAB 2019b. No other MATLAB add ons should be 
 ## References
 
 1. McCoy, RL, Modern Exterior Ballistics: The Launch and Flight Dynamics of Symmetric Projectiles, Schiffer Military History, Atglen, PA, 1998.
+
+# 120 毫米迫击炮弹丸六自由度（6-DOF）弹道飞行的 MATLAB 仿真
+
+仿真通过 Mortar_Sim.m 文件进行设置、运行和控制。主程序调用 MATLAB 的 ODE45 求解器，结合 EoM.m 文件中定义的逐时间步长运动方程（EoM）进行计算。仿真读取标准大气数据表和不同马赫数下的空气动力系数表（McCoy, 1998），其六自由度模型基于 McCoy 第 9 章的方法构建。
+
+Mortar_Sim.m - 主程序
+
+EoM.m - 运动方程
+
+std_atm.csv - 标准大气数据表
+
+Aerodynamic_Char_120mm_Mortar.xlsx - 120 毫米迫击炮弹在不同马赫数下的空气动力系数表（数据源自 McCoy, 1998 第 220 页）
+
+设置与运行
+仿真参数在主程序 Mortar_Sim.m 中设置（第 68-81 行），用于定义迫击炮弹丸出膛进入自由飞行时的初始条件。
+
+
+初始条件设置截图
+
+Vo_set：炮口初始速度（米 / 秒）
+phi_0_set：相对于惯性坐标系的垂直射角（度）（即迫击炮身与水平面的夹角）
+theta_0_set：水平射角（度）（即迫击炮身与垂直于地面并沿 x 轴的垂直平面的夹角）
+
+w_z_0_set 和 w_y0_set：弹丸出膛时的初始俯仰角速度和偏航角速度（弧度 / 秒）（抬头或左偏航为正）
+
+alpha_0_set 和 beta_0_set：弹丸出膛时的俯仰角和偏航角（度）（弹体轴线与惯性坐标系（炮管）轴线的夹角，抬头或左偏航为正，用于设定初始离轴飞行状态）
+
+x_0, y_0, z_0：迫击炮管末端（弹丸进入自由飞行点）的三维坐标（米）
+
+MATLAB 版本与附加组件:本仿真基于 MATLAB 2019b 开发，运行无需额外附加组件。
+
+参考文献:McCoy, RL，《现代外弹道学：对称弹丸的发射与飞行动力学》，Schiffer Military History，Atglen, PA，1998。

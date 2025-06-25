@@ -7,6 +7,7 @@
 %that describe the ballistic motion of a projectile. These equations are
 %based on those found in McCoy, 1998 (see citation below).  The input
 %aerodynamic coefficeints are from McCoy's book as well.
+% 求解描述弹丸弹道运动的 12 个联立常微分方程，同时说明了方程和输入数据的来源，
 
 %Input data from: 
 %1. McCoy, RL, Modern Exterior Ballistics: The Launch and Flight Dynamics 
@@ -47,6 +48,7 @@ std_atm=readmatrix('std_atm.csv','Range','A2:k43');
     
 % Weapon charicteristics - These are the properties of the submunissions.
 % These weapons charicteristics are from McCoy, 1998.  See citation above.
+% 声明在 EoM.m 中会用到的全局变量，对重力加速度、地球半径等标准参数初始化，读取标准大气数据和武器特性数据（包括空气动力学系数）。
 d=119.56/1000; %diameter in m
 Ip=0.02335; %Axial moment of inertia kg*m^2
 It=0.23187; %Transverse moment of inertia kg*m^2
@@ -65,6 +67,7 @@ cmqa2_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A76:B83');
 
 
 %% Intial conditions
+% 设置炮弹的初始速度、发射角度、角速度、姿态角以及初始位置等参数。
 Vo_set = 100; %initial vel at muzzle exit in m/s
 phi_0_set = 45; %vertical angle of departure in deg (pos up)
 theta_0_set = 15;  %horizontal angle of departure in deg(pos to right)
@@ -84,6 +87,7 @@ z_0 = 0; % z-axis (m) - cross-range direction
 
 %% Run program
 % Read and set initial conditions
+% 设定仿真的最大时间，复制初始条件变量，计算初始方向向量及其变化率，明确状态向量各元素含义并设置初始速度和角速度。
 t_max = 300; %max time in seconds
 
 Vo = Vo_set; %initial vel at muzzle exit in m/s
@@ -138,6 +142,7 @@ dx_3o=(1/sqrt(Q))*((-w_z0*sind(theta_0+beta_0)*...
     %the cross-range.
 
 %Set initial velocities
+%完成状态向量 x0 的初始化，设置仿真时间范围，利用 odeset 设定事件函数，调用 ode45 求解器求解 EoM.m 中定义的常微分方程。
 x0(1)=Vo*cosd(phi_0)*cosd(theta_0);
 x0(2)=Vo*sind(phi_0)*cosd(theta_0);
 x0(3)=Vo*sind(theta_0);
@@ -164,6 +169,7 @@ Opt = odeset('Events', @myEvent);
 [t,x]=ode45(@EoM,tspan,x0,Opt); %Run the ODE solver
 
 %Calcualte orientation angles
+% 计算炮弹飞行过程中的姿态角，找到飞行最高点，通过插值计算落地时间、射程、横程、落地角度、落地速度以及总飞行距离。
 alpha=acosd(x(:,2)./((x(:,1).^2+x(:,2).^2+x(:,3).^2).^0.5));
 beta=acosd(x(:,3)./((x(:,1).^2+x(:,2).^2+x(:,3).^2).^0.5));
 
@@ -218,6 +224,9 @@ total_dis = sqrt(x(:,10).^2 + x(:,12).^2);
 total_dis_imact = interp1(x(I:end,11),total_dis(I:end),0);
 
 %% Outputs
+% 在命令窗口显示仿真结果，
+% 包括总飞行距离、落地角度、落地速度、射程和横程，
+% 同时绘制三维弹道图、总距离 - 高度图和射程 - 横程图，最后记录程序运行结束时间并计算运行时长。
 disp(['Total distance traveled = ',num2str(total_dis_imact),' meters'])
 disp(['Impact angle = ',num2str(impact_angle),' degrees'])
 disp(['Impact velocity = ',num2str(impact_vel),' m/s'])
@@ -251,6 +260,7 @@ end_time = toc(start_time);
 %% Termination function for ODE. 
 %Terminate when altitude is less than 0 meaning that the munition impacted
 %the ground.
+% 定义事件函数 myEvent，当炮弹高度小于 0 时，终止 ODE 求解过程。
 function [value, isterminal, direction] = myEvent(t, y)
     %value      = (y(11) < 0);
     value      = y(11);

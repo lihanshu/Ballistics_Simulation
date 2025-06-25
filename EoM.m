@@ -10,6 +10,9 @@ function dx=EoM(t,x)
 %on the equations found in McCoy, 1998 (see citation below).  The input
 %aerodynamic coefficeints are from McCoy's book as well.
 
+% EoM.m 函数通过获取全局变量、计算大气参数、空气动力学系数和力的分量，
+% 最终求解出弹丸运动的 12 个常微分方程的导数，为弹道仿真提供了核心的运动方程计算功能。
+
 %Input data from: 
 %1. McCoy, RL, Modern Exerioor Balistics: The Launch and Flight Dynamics 
 %of Symmetric Projectiles, Schiffer Military History, Atglen, PA, 1998.
@@ -34,10 +37,14 @@ global gravity
 %Find atmospheric variables
 rho=interp1(std_atm(:,1),std_atm(:,7),x(11)/1000); %atmpospheric density in
 %kg/m^3
+% rho：根据弹丸当前高度 x(11) 对标准大气数据 std_atm 进行线性插值，得到当前高度的大气密度。
+%
+% a：同样根据弹丸当前高度进行线性插值，得到当前高度的声速。
 
 a=interp1(std_atm(:,1),std_atm(:,8),x(11)/1000); %speed of sound in m/s
 
 %Find refrence area of projectile.
+% 根据弹丸直径 d 计算弹丸的参考面积 S。
 S=(pi/4)*d^2; %refrence area in m^2
 
 %% Body Forces
