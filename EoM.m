@@ -10,29 +10,21 @@ function dx=EoM(t,x)
 %on the equations found in McCoy, 1998 (see citation below).  The input
 %aerodynamic coefficeints are from McCoy's book as well.
 
-% EoM.m 函数通过获取全局变量、计算大气参数、空气动力学系数和力的分量，
-% 最终求解出弹丸运动的 12 个常微分方程的导数，为弹道仿真提供了核心的运动方程计算功能。
+% EoM.m 是弹道仿真程序的核心函数，用于求解描述弹丸运动的12 个常微分方程。这些方程基于牛顿力学和刚体动力学，考虑了空气阻力、升力、重力和力矩的影响，完整描述了弹丸在三维空间中的运动状态。
+% 输入参数
+% t：当前时间
+% x：状态向量（12 维），包含速度、角速度、姿态和位置信息
+% 输出参数
+% dx：状态向量的导数（12 维），即每个状态变量的变化率
 
 %Input data from: 
 %1. McCoy, RL, Modern Exerioor Balistics: The Launch and Flight Dynamics 
 %of Symmetric Projectiles, Schiffer Military History, Atglen, PA, 1998.
 
 %% Program
-%Get globals from the main program.
-global cdo_wpn
-global clo_wpn
-global cmo_wpn
-global cmqao_wpn
-global cd2_wpn
-global cl2_wpn
-global cm2_wpn
-global cmqa2_wpn
-global std_atm
-global d
-global It
-global m
-global R
-global gravity
+% 获取主程序中的全局变量
+global cdo_wpn clo_wpn cmo_wpn cmqao_wpn cd2_wpn cl2_wpn cm2_wpn cmqa2_wpn ...
+       std_atm d It m R gravity
 
 %Find atmospheric variables
 rho=interp1(std_atm(:,1),std_atm(:,7),x(11)/1000); %atmpospheric density in
@@ -48,90 +40,88 @@ a=interp1(std_atm(:,1),std_atm(:,8),x(11)/1000); %speed of sound in m/s
 S=(pi/4)*d^2; %refrence area in m^2
 
 %% Body Forces
-%find total velocity (does not account for winds)
-V=sqrt(x(1)^2+x(2)^2+x(3)^2);
+% 计算弹丸质心总速度大小（惯性坐标系下x、y、z方向速度的合速度）
+V = sqrt(x(1)^2 + x(2)^2 + x(3)^2);  % V单位：m/s
 
-%Find total angle of attack
-alpha_t=acos((x(1)*x(7)+x(2)*x(8)+x(3)*x(9))/V);
+% 计算总攻角（alpha_t）：弹丸轴向与速度方向的夹角
+% x(7)-x(9)是弹丸轴向单位向量，点乘速度向量再除以V得到夹角余弦值
+alpha_t = acos((x(1)*x(7) + x(2)*x(8) + x(3)*x(9))/V);  % 单位：rad
 
-%find mach number
-mach=V/a;
+% 计算马赫数（气流速度与音速的比值，反映压缩性影响）
+mach = V/a;  % 无量纲
 
-%find dynamic coefficient
-q=rho*V*S;
+% 计算动压系数（q）：空气动力的关键参数，与密度、速度平方、参考面积相关
+q = rho*V*S;  % 单位：kg/(m·s)（后续与气动系数结合得到力的大小）
 
-%Aeroforces - all in nonrotating frame
-%lookup cd,cl,cm,cmqa
-if mach>cdo_wpn(size(cdo_wpn,1),1)
-    M=cdo_wpn(size(cdo_wpn,1),1);
+% 限制马赫数范围：若当前马赫数超过气动系数表的最大值，取表中最大马赫数
+if mach > cdo_wpn(size(cdo_wpn,1),1)
+    M = cdo_wpn(size(cdo_wpn,1),1);  % 表中最大马赫数
 else
-    M=mach;
+    M = mach;  % 当前马赫数
 end
 
-%Look up the aerodynamic coefficients
-cdo=interp1(cdo_wpn(:,1),cdo_wpn(:,2),M);
-cd2=interp1(cd2_wpn(:,1),cd2_wpn(:,2),M);
-clo=interp1(clo_wpn(:,1),clo_wpn(:,2),M);
-cl2=interp1(cl2_wpn(:,1),cl2_wpn(:,2),M);
-cmo=interp1(cmo_wpn(:,1),cmo_wpn(:,2),M);
-cm2=interp1(cm2_wpn(:,1),cm2_wpn(:,2),M);
-cmqao=interp1(cmqao_wpn(:,1),cmqao_wpn(:,2),M);
-cmqa2=interp1(cmqa2_wpn(:,1),cmqa2_wpn(:,2),M);
+% 根据马赫数M插值获取基础气动系数（从Excel表中读取的离散数据）
+cdo = interp1(cdo_wpn(:,1), cdo_wpn(:,2), M);  % 零升阻力系数（马赫数相关）
+cd2 = interp1(cd2_wpn(:,1), cd2_wpn(:,2), M);  % 阻力系数的攻角修正项
+clo = interp1(clo_wpn(:,1), clo_wpn(:,2), M);  % 零攻角升力系数
+cl2 = interp1(cl2_wpn(:,1), cl2_wpn(:,2), M);  % 升力系数的攻角修正项
+cmo = interp1(cmo_wpn(:,1), cmo_wpn(:,2), M);  % 零攻角俯仰力矩系数
+cm2 = interp1(cm2_wpn(:,1), cm2_wpn(:,2), M);  % 力矩系数的攻角修正项
+cmqao = interp1(cmqao_wpn(:,1), cmqao_wpn(:,2), M);  % 零攻角翻转力矩系数
+cmqa2 = interp1(cmqa2_wpn(:,1), cmqa2_wpn(:,2), M);  % 翻转力矩系数的攻角修正项
 
-cd=cdo+cd2*(sin(alpha_t))^2; %Drag
-cl=clo+cl2*(sin(alpha_t))^2; %lift
-cm=cmo+cm2*(sin(alpha_t))^2; %moment
-cmqa=cmqao+cmqa2*(sin(alpha_t))^2; %overturning moment
+% 综合气动系数（加入攻角影响，sin(alpha_t)^2体现非线性关系）
+cd = cdo + cd2*(sin(alpha_t))^2;  % 总阻力系数
+cl = clo + cl2*(sin(alpha_t))^2;  % 总升力系数
+cm = cmo + cm2*(sin(alpha_t))^2;  % 总俯仰力矩系数
+cmqa = cmqao + cmqa2*(sin(alpha_t))^2;  % 总翻转力矩系数
 
-Cd=(q*cd)/(2*m); %Body drag
-Cl=(q*cl)/(2*m); %Body lift
-Cm=(q*d*cm)/(2*It); %body moment
-Cmq=(q*d^2*cmqa)/(2*It); %Body overturning moment
+% 将气动系数转换为单位质量/转动惯量的力或力矩（便于直接代入运动方程）
+Cd = (q*cd)/(2*m);  % 单位质量的阻力加速度（m/s²）
+Cl = (q*cl)/(2*m);  % 单位质量的升力加速度（m/s²）
+Cm = (q*d*cm)/(2*It);  % 单位转动惯量的俯仰角加速度（rad/s²）
+Cmq = (q*d^2*cmqa)/(2*It);  % 单位转动惯量的翻转角加速度（rad/s²）
 
-%gravity compenents in each axis
+% 计算惯性坐标系下的重力分量（修正地球曲率影响）
+g1 = -gravity * x(10)/R;  % x方向重力分量（因地球曲率，指向地心的分力）
+g2 = -gravity * (1 - 2*x(11)/R);  % y方向重力分量（高度越高，重力越小）
+g3 = 0;  % z方向无重力分量（假设对称）
+% 注：注释掉的部分是简化模型（仅y方向有重力），实际使用修正后的分量
+% 中间变量：弹体自旋角速度在轴向的投影（用于修正角加速度计算）
+IpP_It = x(4)*x(7) + x(5)*x(8) + x(6)*x(9);  % 无量纲
 
-g1=-gravity*x(10)/R;
-g2=-gravity*(1-(2*x(11)/R));
-g3=0;
-% g1=0;
-% g2=gravity;
-% g3=0;
+% 以下为12个状态变量的导数（dx(i,1)即dx/dt）
+% ---------------------------
+% 1-3：速度分量的导数（加速度）
+dx(1,1) = -Cd*x(1) + Cl*(V^2*x(7) - V*x(1)*cos(alpha_t)) + g1;
+% 物理意义：x方向加速度 = 阻力加速度（-Cd*x(1)） + 升力加速度（Cl*...） + x方向重力分量（g1）
+% 升力项解析：(V²x7 - Vx1 cosα)是升力方向的速度相关项，体现升力垂直于速度的特性
 
-%Intermediate term for below equations
-IpP_It=x(4)*x(7)+x(5)*x(8)+x(6)*x(9);
+dx(2,1) = -Cd*x(2) + Cl*(V^2*x(8) - V*x(2)*cos(alpha_t)) + g2;  % y方向加速度
+dx(3,1) = -Cd*x(3) + Cl*(V^2*x(9) - V*x(3)*cos(alpha_t)) + g3;  % z方向加速度
 
-%Equations of motion:
-    %x(1) = x-velocity with respect (wrt) intertial frame (m/s).
-    %x(2) = y-velocity wrt intertial frame (m/s).
-    %x(3) = z-velocity wrt intertial frame (m/s).
-    %x(4) = roll rate wrt intertial frame (rad/s).
-    %x(5) = pitch rate wrt intertial frame (m/s).
-    %x(6) = yaw rate wrt intertial frame (m/s).
-    %x(7) = x component of projectile unit vector wrt intertial frame
-    %x(8) = y component of projectile unit vector wrt intertial frame
-    %x(9) = z component of projectile unit vector wrt intertial frame
-    %x(10) = position of munition center of gravity (CG) wrt intertial
-    %frame x-axis (m).  This is the range.
-    %x(11) = position of munition CG wrt intertial frame y-axis (m). 
-    %This is the altitude.
-    %x(12) = position of munition CG wrt intertial frame z-axis (m). 
-    %This is the cross-range.
-    
+% ---------------------------
+% 4-6：角速度分量的导数（角加速度）
+dx(4,1) = Cm*(x(2)*x(9) - x(3)*x(8)) + Cmq*(x(4) - IpP_It*x(7));
+% 物理意义：x方向角加速度 = 俯仰力矩产生的角加速度（Cm*...） + 翻转力矩产生的角加速度（Cmq*...）
+% 力矩项解析：(x2x9 - x3x8)是速度与姿态向量的叉乘项，体现力矩方向与姿态的关系
 
-dx(1,1)=-Cd*x(1)+Cl*(V^2*x(7)-V*x(1)*cos(alpha_t))+g1;
-dx(2,1)=-Cd*x(2)+Cl*(V^2*x(8)-V*x(2)*cos(alpha_t))+g2;
-dx(3,1)=-Cd*x(3)+Cl*(V^2*x(9)-V*x(3)*cos(alpha_t))+g3;
+dx(5,1) = Cm*(x(3)*x(7) - x(1)*x(9)) + Cmq*(x(5) - IpP_It*x(8));  % y方向角加速度
+dx(6,1) = Cm*(x(1)*x(8) - x(2)*x(7)) + Cmq*(x(6) - IpP_It*x(9));  % z方向角加速度
 
-dx(4,1)=Cm*(x(2)*x(9)-x(3)*x(8))+Cmq*(x(4)-IpP_It*x(7));
-dx(5,1)=Cm*(x(3)*x(7)-x(1)*x(9))+Cmq*(x(5)-IpP_It*x(8));
-dx(6,1)=Cm*(x(1)*x(8)-x(2)*x(7))+Cmq*(x(6)-IpP_It*x(9));
+% ---------------------------
+% 7-9：轴向单位向量的导数（姿态变化率）
+dx(7,1) = x(5)*x(9) - x(6)*x(8);
+% 物理意义：姿态向量x分量的变化率 = 俯仰角速度与z分量的叉乘 - 偏航角速度与y分量的叉乘
+% 本质：刚体姿态运动学方程（单位向量随角速度的旋转关系）
 
-dx(7,1)=x(5)*x(9)-x(6)*x(8);
-dx(8,1)=x(6)*x(7)-x(4)*x(9);
-dx(9,1)=x(4)*x(8)-x(5)*x(7);
+dx(8,1) = x(6)*x(7) - x(4)*x(9);  % 姿态向量y分量的变化率
+dx(9,1) = x(4)*x(8) - x(5)*x(7);  % 姿态向量z分量的变化率
 
-dx(10,1)=x(1); 
-dx(11,1)=x(2)+(x(1)^2)/(2*R); 
-dx(12,1)=x(3); 
+% ---------------------------
+% 10-12：位置分量的导数（速度）
+dx(10,1) = x(1);  % x方向位置变化率 = x方向速度
+dx(11,1) = x(2) + (x(1)^2)/(2*R);  % y方向位置变化率 = y方向速度 + 地球曲率修正项
+dx(12,1) = x(3);  % z方向位置变化率 = z方向速度
 
 end

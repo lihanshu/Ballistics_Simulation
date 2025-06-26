@@ -48,16 +48,18 @@ std_atm=readmatrix('std_atm.csv','Range','A2:k43');
     
 % Weapon charicteristics - These are the properties of the submunissions.
 % These weapons charicteristics are from McCoy, 1998.  See citation above.
-% 声明在 EoM.m 中会用到的全局变量，对重力加速度、地球半径等标准参数初始化，读取标准大气数据和武器特性数据（包括空气动力学系数）。
-d=119.56/1000; %diameter in m
-Ip=0.02335; %Axial moment of inertia kg*m^2
-It=0.23187; %Transverse moment of inertia kg*m^2
-m=13.585; %mass in kg
+% 声明在 EoM.m 中会用到的全局变量，对重力加速度、地球半径等标准参数初始化，
+% 读取标准大气数据和武器特性数据（包括空气动力学系数）。
+% 弹丸特性参数（来源于McCoy 1998）
+d = 119.56 / 1000;  % 弹丸直径（米，转换自毫米）
+Ip = 0.02335;       % 轴向转动惯量（kg·m²）
+It = 0.23187;       % 横向转动惯量（kg·m²）
+m = 13.585;         % 弹丸质量（kg）
 
-% Read subminition charicteristics from excel file.  %These weapon 
-% charicteristics are from McCoy, 1998.  See citation above.  
-cdo_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A5:B11');
-cd2_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A15:B22');
+% 读取气动系数（从Excel文件中读取，用于计算空气阻力、升力等）
+cdo_wpn = xlsread('Aerodynamic_Char_120mm_Mortar.xlsx', 'A5:B11');  % 零升阻力系数
+cd2_wpn = xlsread('Aerodynamic_Char_120mm_Mortar.xlsx', 'A15:B22'); % 阻力系数修正项
+% （其余系数类似：cl为升力系数，cm为力矩系数，后缀2表示与攻角平方相关的项）
 clo_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A26:B30');
 cl2_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A34:B41');
 cmo_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A45:B51');
@@ -66,206 +68,134 @@ cmqao_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A67:B72');
 cmqa2_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A76:B83');
 
 
-%% Intial conditions
-% 设置炮弹的初始速度、发射角度、角速度、姿态角以及初始位置等参数。
-Vo_set = 100; %initial vel at muzzle exit in m/s
-phi_0_set = 45; %vertical angle of departure in deg (pos up)
-theta_0_set = 15;  %horizontal angle of departure in deg(pos to right)
 
-w_z0_set=1; %initial pitch rate in rad/s (pos nose up)
-w_y0_set=0.5; %initial transverse yaw rate in rad/s (pos for left yaw)
+%% Initial conditions
+% 初始速度与角度
+Vo_set = 100;       % 初速度（m/s）
+phi_0_set = 45;     % 发射仰角（度，向上为正）
+theta_0_set = 15;   % 发射方位角（度，向右为正）
 
-alpha_0_set = 2; %Pitch angle at muzzle exit in deg
-beta_0_set= -0.5; %initial yaw angle at muzzle exit in deg
+% 初始角速度
+w_z0_set = 1;       % 初始俯仰角速度（rad/s，抬头为正）
+w_y0_set = 0.5;     % 初始偏航角速度（rad/s，左偏为正）
 
-%initial position of munition center of gravity (CG) wrt intertial frame
-x_0 = 0; % x-axis (m) - range direction
-y_0 = 0; % y-axis (m) - altitude
-z_0 = 0; % z-axis (m) - cross-range direction
+% 初始姿态角
+alpha_0_set = 2;    % 初始俯仰角（度）
+beta_0_set = -0.5;  % 初始偏航角（度）
+
+% 初始位置（惯性坐标系下，原点为发射点）
+x_0 = 0;  % x轴：射程方向
+y_0 = 0;  % y轴：高度方向
+z_0 = 0;  % z轴：横程方向
 
 
 
 %% Run program
-% Read and set initial conditions
-% 设定仿真的最大时间，复制初始条件变量，计算初始方向向量及其变化率，明确状态向量各元素含义并设置初始速度和角速度。
-t_max = 300; %max time in seconds
+t_max = 300;  % 最大仿真时间（秒）
 
-Vo = Vo_set; %initial vel at muzzle exit in m/s
-phi_0 = phi_0_set; %vertical angle of departure in deg (pos up)
-theta_0 = theta_0_set; %horizontal angle of departure in deg(pos to right)
-
-w_z0 = w_z0_set; %initial pitch rate in rad/s (pos nose up)
-w_y0 = w_y0_set; %initial transverse yaw rate in rad/s (pos for left yaw)
-
-alpha_0 = alpha_0_set; %Pitch angle at muzzle exit in deg
-beta_0 = beta_0_set; %initial yaw angle at muzzle exit in deg
-
-p = 0; %initial spin rate in rad/s
+% 复制初始条件到临时变量（避免直接修改原始参数）
+Vo = Vo_set; phi_0 = phi_0_set; theta_0 = theta_0_set;
+w_z0 = w_z0_set; w_y0 = w_y0_set; alpha_0 = alpha_0_set; 
+beta_0 = beta_0_set;
+p = 0;  % 初始自旋角速度（rad/s，此处设为0）
 
 %% Intermediate Calcs
-%Calculate initial orientation of x-vector (vector along primary
-%axis).  This is the orientation of the body fame relative to the
-%inertial frame.
-X1o=cosd(phi_0+alpha_0)*cosd(theta_0+beta_0);
-X2o=sind(phi_0+alpha_0)*cosd(theta_0+beta_0);
-X3o=sind(theta_0+beta_0);
+% 计算弹丸初始轴向单位向量（弹体坐标系相对于惯性坐标系的指向）
+X1o = cosd(phi_0 + alpha_0) * cosd(theta_0 + beta_0);  % x分量
+X2o = sind(phi_0 + alpha_0) * cosd(theta_0 + beta_0);  % y分量
+X3o = sind(theta_0 + beta_0);                          % z分量
 
-%Caclulate initial rate of change of x-vector.  This is the initial
-%velocity in each x,y,and z direction.  The Q variable is an
-%intermediate variable.
-Q=((sind(theta_0+beta_0))^2)+((cosd(theta_0+beta_0))^2)*...
-    ((cosd(phi_0+alpha_0))^2);
-dx_1o=(1/sqrt(Q))*(-w_z0*((cosd(theta_0+beta_0))^2)*...
-    sind(phi_0+alpha_0)*cosd(phi_0+alpha_0)+w_y0*...
-    sind(theta_0+beta_0));
-dx_2o=(1/sqrt(Q))*(w_z0*((cosd(theta_0+beta_0))^2)*...
-    ((cosd(phi_0+alpha_0))^2)+w_z0*((sind(theta_0+beta_0))^2));
-dx_3o=(1/sqrt(Q))*((-w_z0*sind(theta_0+beta_0)*...
-    cosd(theta_0+beta_0)*sind(phi_0+alpha_0))-...
-    (w_y0*cosd(theta_0+beta_0)*cosd(phi_0+alpha_0)));
+% 计算轴向单位向量的初始变化率（用于后续角速度转换）
+Q = (sind(theta_0 + beta_0))^2 + (cosd(theta_0 + beta_0))^2 * (cosd(phi_0 + alpha_0))^2;
+dx_1o = (1/sqrt(Q)) * (-w_z0 * (cosd(theta_0 + beta_0))^2 * sind(phi_0 + alpha_0) * cosd(phi_0 + alpha_0) + w_y0 * sind(theta_0 + beta_0));
+dx_2o = (1/sqrt(Q)) * (w_z0 * (cosd(theta_0 + beta_0))^2 * (cosd(phi_0 + alpha_0))^2 + w_z0 * (sind(theta_0 + beta_0))^2);
+dx_3o = (1/sqrt(Q)) * (-w_z0 * sind(theta_0 + beta_0) * cosd(theta_0 + beta_0) * sind(phi_0 + alpha_0) - w_y0 * cosd(theta_0 + beta_0) * cosd(phi_0 + alpha_0));
 
-%Equations of motion:
-%x(1) = x-velocity with respect (wrt) intertial frame (m/s).
-%x(2) = y-velocity wrt intertial frame (m/s).
-%x(3) = z-velocity wrt intertial frame (m/s).
-%x(4) = roll rate wrt intertial frame (rad/s).
-%x(5) = pitch rate wrt intertial frame (m/s).
-%x(6) = yaw rate wrt intertial frame (m/s).
-%x(7) = x component of projectile unit vector wrt intertial frame
-%x(8) = y component of projectile unit vector wrt intertial frame
-%x(9) = z component of projectile unit vector wrt intertial frame
-%x(10) = position of munition center of gravity (CG) wrt intertial
-    %frame x-axis (m).  This is the range.
-%x(11) = position of munition CG wrt intertial frame y-axis (m). This is 
-    %the altitude.
-%x(12) = position of munition CG wrt intertial frame z-axis (m). This is 
-    %the cross-range.
 
-%Set initial velocities
-%完成状态向量 x0 的初始化，设置仿真时间范围，利用 odeset 设定事件函数，调用 ode45 求解器求解 EoM.m 中定义的常微分方程。
-x0(1)=Vo*cosd(phi_0)*cosd(theta_0);
-x0(2)=Vo*sind(phi_0)*cosd(theta_0);
-x0(3)=Vo*sind(theta_0);
+% 状态向量x的定义（共12个元素，描述弹丸的完整运动状态）：
+% x(1): x方向速度（m/s）；x(2): y方向速度（m/s）；
+% x(3): z方向速度（m/s）
+% x(4): 滚转角速度（rad/s）；x(5): 俯仰角速度（rad/s）；
+% x(6): 偏航角速度（rad/s）
+% x(7)-x(9): 轴向单位向量的x、y、z分量（描述姿态）
+% x(10): x方向位置（射程，m）；x(11): y方向位置（高度，m）；
+% x(12): z方向位置（横程，m）
 
-%Set initial angular rates
-x0(4)=((Ip*p)/It)*X1o+X2o*dx_3o-X3o*dx_2o;
-x0(5)=((Ip*p)/It)*X2o+X1o*dx_3o+X3o*dx_1o;
-x0(6)=((Ip*p)/It)*X3o+X1o*dx_2o+X2o*dx_1o;
+% 初始化状态向量
+x0(1) = Vo * cosd(phi_0) * cosd(theta_0);  % 初始x方向速度
+x0(2) = Vo * sind(phi_0) * cosd(theta_0);  % 初始y方向速度
+x0(3) = Vo * sind(theta_0);                % 初始z方向速度
+x0(4) = (Ip*p/It)*X1o + X2o*dx_3o - X3o*dx_2o;  % 初始滚转角速度
+x0(5) = (Ip*p/It)*X2o + X1o*dx_3o + X3o*dx_1o;  % 初始俯仰角速度
+x0(6) = (Ip*p/It)*X3o + X1o*dx_2o + X2o*dx_1o;  % 初始偏航角速度
+x0(7:9) = [X1o, X2o, X3o];  % 初始轴向单位向量
+x0(10:12) = [x_0, y_0, z_0];  % 初始位置
 
-%Set initial orientation pointing vector
-x0(7)=X1o;
-x0(8)=X2o;
-x0(9)=X3o;
+% 求解ODE：调用ode45求解器，积分运动方程EoM.m
+tspan = [0 t_max];  % 仿真时间范围
+Opt = odeset('Events', @myEvent);  % 设置事件函数（落地时终止仿真）
+[t, x] = ode45(@EoM, tspan, x0, Opt);  % t为时间序列，x为状态向量随时间的变化
 
-%Set initial position
-x0(10)=x_0; % initial position in range direction (m)
-x0(11)=y_0; % intial position in altitude (m)
-x0(12)=z_0; % initial position in cross-range direction (m)
+%% Intermediate Calcs（续）
+% 计算姿态角（俯仰角alpha、偏航角beta）
+alpha = acosd(x(:,2) ./ sqrt(x(:,1).^2 + x(:,2).^2 + x(:,3).^2));
+beta = acosd(x(:,3) ./ sqrt(x(:,1).^2 + x(:,2).^2 + x(:,3).^2));
 
-%Run the ODE solver to propigate the submunissions through the air.
-%Evaluate system of differential equations.
-tspan=[0 t_max]; %Time span of simulation in sec
-Opt = odeset('Events', @myEvent);
-[t,x]=ode45(@EoM,tspan,x0,Opt); %Run the ODE solver
+% 找到弹道最高点（最大高度及对应索引）
+[max_ht, I] = max(x(:,11));
 
-%Calcualte orientation angles
-% 计算炮弹飞行过程中的姿态角，找到飞行最高点，通过插值计算落地时间、射程、横程、落地角度、落地速度以及总飞行距离。
-alpha=acosd(x(:,2)./((x(:,1).^2+x(:,2).^2+x(:,3).^2).^0.5));
-beta=acosd(x(:,3)./((x(:,1).^2+x(:,2).^2+x(:,3).^2).^0.5));
+% 插值计算落地时间、射程、横程（从最高点到落地的区间内插值，避免发射点干扰）
+impact_time = interp1(x(I:end,11), t(I:end), 0);  % 落地时间
+range = interp1(x(I:end,11), x(I:end,10), 0);      % 射程（x方向）
+cross_range = interp1(x(I:end,11), x(I:end,12), 0);  % 横程（z方向）
 
-%Find the appogee of the munition's flight.
-[max_ht,I]=max(x(:,11));
+% 计算落地时的姿态角、速度向量及总速度
+impact_alpha = interp1(x(I:end,11), alpha(I:end), 0);
+impact_beta = interp1(x(I:end,11), beta(I:end), 0);
+vel_x_imp = interp1(x(I:end,11), x(I:end,1), 0);  % 落地x方向速度
+vel_y_imp = interp1(x(I:end,11), x(I:end,2), 0);  % 落地y方向速度
+vel_z_imp = interp1(x(I:end,11), x(I:end,3), 0);  % 落地z方向速度
+impact_vel = sqrt(vel_x_imp^2 + vel_y_imp^2 + vel_z_imp^2);  % 落地总速度
 
-%Find the time of impact by interpolating the time when the altitude is 
-%zero (after appogee) 
-impact_time=interp1(x(I:end,11),t(I:end),0);
+% 计算落地角度（与竖直方向的夹角）
+impactVect = [cosd(impact_beta)*cosd(impact_alpha), sind(impact_beta)*cosd(impact_alpha), sind(impact_alpha)];
+vert = [0,1,0];  % 竖直向下向量
+impact_angle = acosd(dot(vert, impactVect)/(norm(vert)*norm(impactVect))) - 90;  % 落地角度
 
-%Find the range when the munitions impacts.(distance along
-%interial frame x-axis when the munition impacts the ground)
-range=interp1(x(I:end,11),x(I:end,10),0);
-
-%Find the crossrange when the munitions impacts.  (distance
-%along interial frame z-axis when the munition impacts the ground)
-cross_range=interp1(x(I:end,11),x(I:end,12),0);
-
-%Determine the orientation of the munition. Find 3D vector of impact
-%direction and use dot product with vertical vector. First, find alpha and
-%beta angles at impact. Alpha is angle of munition in x-y plane (vertical
-%plane) and beta is the angle of the munition in the x-z plane (horizontal
-%or ground plane).
-impact_alpha = interp1(x(I:end,11),alpha(I:end),0);
-impact_beta = interp1(x(I:end,11),beta(I:end),0);
-
-%Create 3D vector of impact direction
-impactVect_x_coord = cosd(impact_beta)*cosd(impact_alpha);
-impactVect_y_coord = sind(impact_beta)*cosd(impact_alpha);
-impactVect_z_coord = sind(impact_alpha);
-impactVect = [impactVect_x_coord, impactVect_y_coord, impactVect_z_coord];
-
-vert = [0,1,0]; %vertical vector pointing down
-
-%Find total 3D impact angle in degrees using dot product
-impact_angle = acosd(dot(vert,impactVect)/(norm(vert)*...
-    norm(impactVect))) - 90;
-
-%Find the impact valocity in all three axises and then
-%combine to get total impact velocity.
-vel_x_imp=interp1(x(I:end,11),x(I:end,1),0);
-vel_y_imp=interp1(x(I:end,11),x(I:end,2),0);
-vel_z_imp=interp1(x(I:end,11),x(I:end,3),0);
-impact_vel=sqrt(vel_x_imp^2+vel_y_imp^2+vel_z_imp^2);
-
-%Total distance vector along the x-z plane (ground plane). This takes
-%into account distance in the range (x-direction) and cross-range
-%(z-direction).
+% 总飞行距离（地面平面内的射程与横程合成）
 total_dis = sqrt(x(:,10).^2 + x(:,12).^2);
-
-%Find total distance at impact
-total_dis_imact = interp1(x(I:end,11),total_dis(I:end),0);
+total_dis_impact = interp1(x(I:end,11), total_dis(I:end), 0);  % 落地总距离
 
 %% Outputs
-% 在命令窗口显示仿真结果，
-% 包括总飞行距离、落地角度、落地速度、射程和横程，
-% 同时绘制三维弹道图、总距离 - 高度图和射程 - 横程图，最后记录程序运行结束时间并计算运行时长。
-disp(['Total distance traveled = ',num2str(total_dis_imact),' meters'])
-disp(['Impact angle = ',num2str(impact_angle),' degrees'])
-disp(['Impact velocity = ',num2str(impact_vel),' m/s'])
-disp(['Range along x-axis at impact = ',num2str(range),' m'])
-disp(['Cross-range along z-axis at impact = ',num2str(cross_range),' m'])
+% 打印关键结果到命令行
+disp(['总飞行距离 = ', num2str(total_dis_impact), ' 米']);
+disp(['落地角度 = ', num2str(impact_angle), ' 度']);
+disp(['落地速度 = ', num2str(impact_vel), ' m/s']);
+disp(['射程（x方向） = ', num2str(range), ' 米']);
+disp(['横程（z方向） = ', num2str(cross_range), ' 米']);
 
-%Plots
-figure()
-subplot(1,3,1)
-plot3(x(1:end,10),x(1:end,12),x(1:end,11))
-grid on
-xlabel('range (m)')
-ylabel('cross-range (m)')
-zlabel('altitude (m)')
-axis tight
+% 绘制弹道可视化图
+figure();
+subplot(1,3,1);  % 3D弹道图（射程-横程-高度）
+plot3(x(:,10), x(:,12), x(:,11)); grid on;
+xlabel('射程 (m)'); ylabel('横程 (m)'); zlabel('高度 (m)'); axis tight;
 
-subplot(1,3,2)
-plot(total_dis(1:end),x(1:end,11))
-grid on
-xlabel('total distance (m)')
-ylabel('altitude (m)')
+subplot(1,3,2);  % 总距离-高度图
+plot(total_dis, x(:,11)); grid on;
+xlabel('总距离 (m)'); ylabel('高度 (m)');
 
-subplot(1,3,3)
-plot(x(1:end,10),x(1:end,12))
-grid on
-xlabel('range (m)')
-ylabel('cross-range(m)')
+subplot(1,3,3);  % 射程-横程图（地面轨迹）
+plot(x(:,10), x(:,12)); grid on;
+xlabel('射程 (m)'); ylabel('横程 (m)');
 
+% 计算程序运行时间
 end_time = toc(start_time);
 
-%% Termination function for ODE. 
-%Terminate when altitude is less than 0 meaning that the munition impacted
-%the ground.
-% 定义事件函数 myEvent，当炮弹高度小于 0 时，终止 ODE 求解过程。
+%% Termination function for ODE
 function [value, isterminal, direction] = myEvent(t, y)
-    %value      = (y(11) < 0);
-    value      = y(11);
-    isterminal = 1;   % Stop the integration
-    direction  = -1;
+    value = y(11);          % 检测变量：高度（y方向位置）
+    isterminal = 1;         % 1=满足条件时终止仿真
+    direction = -1;         % 只检测高度从正变负（落地）的情况
 end
 
     
