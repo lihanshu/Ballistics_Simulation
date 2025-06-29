@@ -71,8 +71,8 @@ cmqa2_wpn=xlsread('Aerodynamic_Char_120mm_Mortar.xlsx','A76:B83');
 
 %% Initial conditions
 % 初始速度与角度
-Vo_set = 100;       % 初速度（m/s）
-phi_0_set = 45;     % 发射仰角（度，向上为正）
+Vo_set = 300;       % 初速度（m/s）
+phi_0_set = 65;     % 发射仰角（度，向上为正）
 theta_0_set = 15;   % 发射方位角（度，向右为正）
 
 % 初始角速度

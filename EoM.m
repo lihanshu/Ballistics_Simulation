@@ -10,7 +10,8 @@ function dx=EoM(t,x)
 %on the equations found in McCoy, 1998 (see citation below).  The input
 %aerodynamic coefficeints are from McCoy's book as well.
 
-% EoM.m 是弹道仿真程序的核心函数，用于求解描述弹丸运动的12 个常微分方程。这些方程基于牛顿力学和刚体动力学，考虑了空气阻力、升力、重力和力矩的影响，完整描述了弹丸在三维空间中的运动状态。
+% EoM.m 是弹道仿真程序的核心函数，用于求解描述弹丸运动的12 个常微分方程。这些方程基于牛顿力学和刚体动力学，
+% 考虑了空气阻力、升力、重力和力矩的影响，完整描述了弹丸在三维空间中的运动状态。
 % 输入参数
 % t：当前时间
 % x：状态向量（12 维），包含速度、角速度、姿态和位置信息
